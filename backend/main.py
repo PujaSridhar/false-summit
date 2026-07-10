@@ -1,0 +1,77 @@
+"""FastAPI app — thin HTTP layer over game.py."""
+import os
+
+from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
+
+from . import game
+
+app = FastAPI(title="False Summit")
+
+
+class Op(BaseModel):
+    tool: str
+    params: dict | None = None
+
+
+class OpsBody(BaseModel):
+    ops: list[Op] = []
+
+
+def _ops(body: OpsBody):
+    return [{"tool": o.tool, "params": o.params or {}} for o in body.ops]
+
+
+@app.post("/api/games")
+def new_game():
+    return game.create_game()
+
+
+@app.get("/api/games/{gid}")
+def get_state(gid: str):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    return game.state(gid)
+
+
+@app.post("/api/games/{gid}/preview")
+def preview(gid: str, body: OpsBody):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    return game.preview(gid, _ops(body))
+
+
+@app.post("/api/games/{gid}/upload")
+def upload(gid: str, body: OpsBody):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    return game.upload(gid, _ops(body))
+
+
+class ReviewBody(BaseModel):
+    action: str  # "stand" | "withdraw"
+
+
+@app.post("/api/games/{gid}/review")
+def review(gid: str, body: ReviewBody):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    try:
+        return game.review_action(gid, body.action)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+@app.post("/api/games/{gid}/edit")
+def edit(gid: str, body: OpsBody):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    try:
+        return game.edit_upload(gid, _ops(body))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+
+
+FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
+app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="static")

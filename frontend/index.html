@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>False Summit</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <div class="logo">FALSE<span>SUMMIT</span></div>
+  <div class="tagline">every crown has a price</div>
+  <div id="scoreboard"></div>
+</header>
+
+<main>
+  <section class="left">
+    <div id="map"></div>
+    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+  </section>
+
+  <aside class="right">
+    <div class="card" id="level-card">
+      <div class="level-kicker" id="level-kicker"></div>
+      <h2 id="level-title"></h2>
+      <p id="level-brief"></p>
+      <p class="taunt" id="level-taunt"></p>
+      <p class="intel"><b>INTEL</b> <span id="level-intel"></span></p>
+    </div>
+
+    <div class="card times">
+      <div class="time-row rival"><span id="rival-name">Rival</span><b id="rival-time">–</b></div>
+      <div class="time-row you"><span>Your upload</span><b id="your-time">–</b></div>
+      <div id="delta" class="delta"></div>
+    </div>
+
+    <div class="card" id="tools-card">
+      <h3>The Toolkit</h3>
+      <div id="tools"></div>
+    </div>
+
+    <button id="upload-btn">UPLOAD RIDE</button>
+    <div class="audit-note">Uploads run through the integrity audit. There is no undo.</div>
+  </aside>
+</main>
+
+<div id="modal" class="modal hidden">
+  <div class="modal-box">
+    <div id="modal-outcome" class="outcome"></div>
+    <div id="modal-verdict" class="verdict"></div>
+    <div id="modal-checks"></div>
+    <div id="modal-actions"></div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
