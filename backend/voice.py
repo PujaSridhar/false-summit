@@ -12,17 +12,40 @@ import threading
 FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 AUDIO_DIR = os.path.join(FRONTEND, "audio")
 
-# Two distinct characters. Defaults are well-known public ElevenLabs voice
-# ids; override per-role via env if you want a different cast.
+# Character voices. If env overrides aren't set, we resolve two distinct
+# voices from whatever the account actually has access to (free tier can't
+# use the shared voice library via API, so hardcoded ids may 402).
 VOICES = {
-    "rival": os.environ.get("ELEVENLABS_VOICE_RIVAL", "TxGEqnHWrfWFTfGW9XjX"),   # Josh
-    "auditor": os.environ.get("ELEVENLABS_VOICE_AUDITOR", "onwK4e9ZLuTAKqWW03F9"),  # Daniel
+    "rival": os.environ.get("ELEVENLABS_VOICE_RIVAL"),
+    "auditor": os.environ.get("ELEVENLABS_VOICE_AUDITOR"),
 }
 MODEL = os.environ.get("ELEVENLABS_MODEL", "eleven_turbo_v2_5")
 
 _client = None
 _client_tried = False
+_voices_resolved = False
 _lock = threading.Lock()
+
+
+def _resolve_voices(client):
+    """Fill any unset role with a real voice from the account's library."""
+    global _voices_resolved
+    if _voices_resolved:
+        return
+    _voices_resolved = True
+    if VOICES["rival"] and VOICES["auditor"]:
+        return
+    try:
+        available = list(client.voices.get_all().voices)
+        ids = [v.voice_id for v in available]
+        if ids:
+            VOICES["rival"] = VOICES["rival"] or ids[0]
+            VOICES["auditor"] = VOICES["auditor"] or (ids[1] if len(ids) > 1 else ids[0])
+            names = {v.voice_id: v.name for v in available}
+            print(f"[voice] using account voices: rival={names.get(VOICES['rival'])}, "
+                  f"auditor={names.get(VOICES['auditor'])}")
+    except Exception as e:  # pragma: no cover - network path
+        print(f"[voice] could not list account voices: {e}")
 
 
 def enabled():
@@ -52,7 +75,10 @@ def say(text, role="rival"):
     client = _get_client()
     if client is None:
         return None
-    voice_id = VOICES.get(role, VOICES["rival"])
+    _resolve_voices(client)
+    voice_id = VOICES.get(role) or VOICES.get("rival")
+    if not voice_id:
+        return None
     key = hashlib.sha256(f"{voice_id}:{MODEL}:{text}".encode()).hexdigest()[:16]
     fname = f"{key}.mp3"
     fpath = os.path.join(AUDIO_DIR, fname)

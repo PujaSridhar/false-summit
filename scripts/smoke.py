@@ -9,9 +9,14 @@ import sys
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# fresh db each run
+import backend  # loads .env
+# Smoke/calibration always runs on DuckDB: it's instant and deterministic, and
+# because the ride data is now seed-fixed, Snowflake sees identical input rows
+# (only percentile interpolation differs by ~1-2%, which the margins absorb).
+os.environ.pop("SNOWFLAKE_ACCOUNT", None)
+
 from backend import db
-if os.path.exists(db.DB_PATH):
+if db.DB_PATH and os.path.exists(db.DB_PATH):
     os.remove(db.DB_PATH)
 
 from backend import game

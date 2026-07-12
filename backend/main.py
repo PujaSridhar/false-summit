@@ -5,9 +5,21 @@ from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from . import game
+from . import ai, db, game, voice
 
 app = FastAPI(title="False Summit")
+
+
+@app.on_event("startup")
+def _log_config():
+    print(f"[false-summit] storage={db.BACKEND}  "
+          f"gemini={'on' if ai.enabled() else 'off (canned)'}  "
+          f"voice={'on' if voice.enabled() else 'off (silent)'}")
+
+
+@app.get("/api/config")
+def config():
+    return {"storage": db.BACKEND, "gemini": ai.enabled(), "voice": voice.enabled()}
 
 
 class Op(BaseModel):

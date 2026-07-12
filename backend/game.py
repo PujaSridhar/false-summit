@@ -1,5 +1,4 @@
 """Game orchestration: state, preview, upload/audit flow."""
-import hashlib
 import uuid
 
 from . import ai, db, detection, narrative, voice
@@ -12,7 +11,11 @@ GAMES = {}
 
 
 def _seed(gid, level):
-    return int(hashlib.sha256(f"{gid}:{level}".encode()).hexdigest()[:8], 16)
+    # Deterministic per level (independent of game id): the five rides are a
+    # hand-calibrated, reliable scenario. Narrative variety comes from Gemini,
+    # not from the physics — so the game plays identically every time while
+    # still feeling fresh. Keeps clean paths robustly winnable across backends.
+    return 4200 + level * 17
 
 
 def _setup_level(game, level_id):

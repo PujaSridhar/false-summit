@@ -55,7 +55,7 @@ def _one(sql, params):
 def check_timestamps(activity_id, params, ctx):
     row = _one(
         """
-        SELECT min(dt), max(dt), count(*) FILTER (WHERE dt <= 0) FROM (
+        SELECT min(dt), max(dt), sum(CASE WHEN dt <= 0 THEN 1 ELSE 0 END) FROM (
           SELECT ts - lag(ts) OVER (ORDER BY idx) AS dt
           FROM trackpoints WHERE activity_id = ?
         ) WHERE dt IS NOT NULL
@@ -147,7 +147,7 @@ def check_accel_spikes(activity_id, params, ctx):
       SELECT idx, v - lag(v) OVER (ORDER BY idx) AS a
       FROM kin WHERE v IS NOT NULL
     )
-    SELECT max(abs(a)), count(*) FILTER (WHERE abs(a) > ?) FROM acc WHERE a IS NOT NULL
+    SELECT max(abs(a)), sum(CASE WHEN abs(a) > ? THEN 1 ELSE 0 END) FROM acc WHERE a IS NOT NULL
     """
     row = _one(sql, [activity_id, limit])
     amax, n_over = row
@@ -252,17 +252,10 @@ def check_elevation_match(activity_id, params, ctx):
 
 
 def check_snapshot_diff(activity_id, params, ctx):
-    """Time Travel: compare current trackpoints against the as-uploaded snapshot.
-    DuckDB dev-mode uses a snapshot table; Snowflake prod uses AT(...)."""
-    sql = """
-    SELECT count(*) FROM (
-      SELECT idx, ts, lat, lon, ele, hr FROM trackpoints WHERE activity_id = ?
-      EXCEPT
-      SELECT idx, ts, lat, lon, ele, hr FROM trackpoints_snapshot WHERE activity_id = ?
-    )
-    """
-    row = _one(sql, [activity_id, activity_id])
-    changed = row[0] or 0
+    """Time Travel: compare current trackpoints against the file as it existed
+    at upload time. The storage backend owns how the original is recovered —
+    DuckDB via a snapshot table, Snowflake via AT(TIMESTAMP => ...)."""
+    changed = db.snapshot_changed_count(activity_id)
     passed = changed == 0
     return {
         "name": "snapshot_diff", "title": "Historical record comparison",

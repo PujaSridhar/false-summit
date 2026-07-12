@@ -161,10 +161,11 @@ def taunt(level_id, segment_name, rival):
     if client is None:
         return canned
     data = _generate_json(
-        f"The rival cyclist {rival} just held onto the crown on the segment "
-        f"'{segment_name}'. Write one short, smug, in-character taunt (max 22 "
-        f'words). JSON: {{"taunt": string}}',
-        "You write terse, cocky sports-rival trash talk. Output JSON.",
+        f"You ARE the cyclist {rival}. You just held onto the crown on the "
+        f"segment '{segment_name}' against your bitter rival. Write ONE short, "
+        f"smug, first-person taunt aimed at them (max 22 words). Do not include "
+        f'your own name or any label. JSON: {{"taunt": string}}',
+        "You write terse, cocky, first-person sports-rival trash talk. Output JSON.",
     )
     if data and data.get("taunt"):
         return f"{rival}: '{data['taunt']}'"
