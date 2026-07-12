@@ -2,7 +2,7 @@
 import hashlib
 import uuid
 
-from . import db, detection, narrative
+from . import ai, db, detection, narrative, voice
 from .cheats import apply_ops
 from .detection import run_checks, tightened
 from .levels import RIDER, level_cfg
@@ -38,14 +38,29 @@ def _setup_level(game, level_id):
     hist_aid = uuid.uuid4().hex[:12]
     db.insert_activity(hist_aid, game["id"], level_id, "history", honest)
     game["history_wkg"] = detection.wkg_p98(hist_aid, RIDER["mass"])
+    # generate the rival taunt + voice once (cached), not on every state poll
+    taunt = ai.taunt(cfg["id"], cfg["segment_name"], narrative.RIVAL)
+    game["taunt"] = taunt
+    game["taunt_audio"] = voice.say(taunt, role="rival")
 
 
 def create_game():
     gid = uuid.uuid4().hex[:12]
-    game = {"id": gid, "wins": [], "flags": 0, "state": "playing"}
+    game = {"id": gid, "wins": [], "flags": 0, "state": "playing", "dossier": []}
     GAMES[gid] = game
     _setup_level(game, 1)
     return state(gid)
+
+
+def _record(game, cfg, ops, outcome, results):
+    """Append this attempt to the case file that feeds the final report."""
+    game["dossier"].append({
+        "level": cfg["id"],
+        "segment": cfg["segment_name"],
+        "tools": [o["tool"] for o in ops],
+        "outcome": outcome,
+        "checks": [{"name": r["name"], "passed": r["passed"]} for r in results],
+    })
 
 
 def _series(points, every=5):
@@ -88,7 +103,8 @@ def state(gid):
             "id": cfg["id"], "title": cfg["title"],
             "segment_name": cfg["segment_name"],
             "brief": cfg["brief"], "intel": cfg["intel"],
-            "taunt": narrative.taunt(cfg["id"]),
+            "taunt": game.get("taunt") or narrative.taunt(cfg["id"]),
+            "taunt_audio": game.get("taunt_audio"),
             "tools": cfg["tools"],
             "checks": [{"name": k} for k in cfg["checks"]],
             "rival": narrative.RIVAL,
@@ -167,6 +183,7 @@ def upload(gid, ops):
     }
     if outcome == "caught":
         game["flags"] += 1
+        _record(game, cfg, ops, "caught", results)
         return resp
 
     if outcome == "win" and cfg.get("review"):
@@ -174,13 +191,18 @@ def upload(gid, ops):
             "activity_id": aid,
             "points": doctored,
             "stats": stats,
+            "ops": ops,
+            "results": results,
         }
         resp["outcome"] = "under_review"
         resp["verdict"] = narrative.UNDER_REVIEW
         return resp
 
     if outcome == "win":
+        _record(game, cfg, ops, "win", results)
         _advance_on_win(game, resp)
+    else:
+        _record(game, cfg, ops, "too_slow", results)
     return resp
 
 
@@ -195,6 +217,7 @@ def review_action(gid, action):
 
     if action == "withdraw":
         game.pop("pending_review")
+        _record(game, cfg, pending["ops"], "withdrawn", pending["results"])
         return {
             "outcome": "withdrawn",
             "verdict": narrative.WITHDRAWN,
@@ -219,6 +242,7 @@ def review_action(gid, action):
         "checks": results,
         "verdict": narrative.REVIEW_CAUGHT if caught else narrative.REVIEW_SURVIVED,
     }
+    _record(game, cfg, pending["ops"], resp["outcome"], results)
     if caught:
         game["flags"] += 1
     else:
@@ -255,8 +279,22 @@ def edit_upload(gid, ops):
         "checks": results,
         "verdict": narrative.EDIT_CAUGHT if caught else narrative.REVIEW_SURVIVED,
     }
+    _record(game, cfg, [{"tool": "edit_under_review"}], resp["outcome"], results)
     if caught:
         game["flags"] += 1
     elif resp["outcome"] == "win":
         _advance_on_win(game, resp)
     return resp
+
+
+def report(gid):
+    """The closing case file — generated from the dossier, optionally voiced."""
+    game = GAMES[gid]
+    if "report" in game:
+        return game["report"]
+    rep = ai.investigation_report(game.get("dossier", []), narrative.RIVAL)
+    rep["audio"] = voice.say(voice.report_script(rep), role="auditor")
+    rep["crowns"] = len(game["wins"])
+    rep["flags"] = game["flags"]
+    game["report"] = rep
+    return rep

@@ -157,12 +157,14 @@ function schedulePreview() {
   }, 250);
 }
 
+function playAudio(url) {
+  if (!url) return;
+  try { new Audio(url).play().catch(() => {}); } catch (e) { /* ignore */ }
+}
+
 function renderState() {
   if (st.state === "finished") {
-    $("level-kicker").textContent = "THE END";
-    $("level-title").textContent = "Every crown taken.";
-    $("level-brief").textContent = "You beat every audit. Nobody knows. You know.";
-    $("upload-btn").disabled = true;
+    showReport();
     return;
   }
   const lv = st.level;
@@ -177,6 +179,39 @@ function renderState() {
   updateTimes(st.honest_stats, lv.rival_time_s);
   renderChart(st.series);
   initMap(st.series);
+  if (lv.taunt_audio && lv.id !== lastTauntLevel) {
+    lastTauntLevel = lv.id;
+    playAudio(lv.taunt_audio);
+  }
+}
+let lastTauntLevel = null;
+
+async function showReport() {
+  const rep = await api(`/api/games/${gid}/report`);
+  const box = document.querySelector(".modal-box");
+  $("modal-outcome").textContent = rep.title;
+  $("modal-outcome").className = "outcome caught";
+  $("modal-verdict").textContent = rep.subtitle;
+  const wrap = $("modal-checks");
+  wrap.innerHTML = "";
+  rep.findings.forEach((f) => {
+    const div = document.createElement("div");
+    div.className = "check fail report-finding";
+    div.innerHTML = `<div class="head"><span>${f.segment}</span></div>
+      <div class="detail">${f.finding}</div>`;
+    wrap.appendChild(div);
+  });
+  const verdict = document.createElement("div");
+  verdict.className = "report-verdict";
+  verdict.innerHTML = `<p>${rep.verdict}</p><p class="closing">${rep.closing}</p>
+    <div class="report-tally">crowns taken: <b>${rep.crowns}</b> · times flagged: <b>${rep.flags}</b>
+    · report by: <b>${rep.generated_by === "gemini" ? "Gemini" : "case template"}</b></div>`;
+  wrap.appendChild(verdict);
+  const actions = $("modal-actions");
+  actions.innerHTML = "";
+  addAction("NEW SEASON", "primary", () => location.reload());
+  $("modal").classList.remove("hidden");
+  playAudio(rep.audio);
 }
 
 const LABELS = {

@@ -73,5 +73,12 @@ def edit(gid: str, body: OpsBody):
         raise HTTPException(409, str(e))
 
 
+@app.get("/api/games/{gid}/report")
+def report(gid: str):
+    if gid not in game.GAMES:
+        raise HTTPException(404, "no such game")
+    return game.report(gid)
+
+
 FRONTEND = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "frontend")
 app.mount("/", StaticFiles(directory=FRONTEND, html=True), name="static")
