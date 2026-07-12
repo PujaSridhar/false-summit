@@ -157,6 +157,11 @@ def _canned_report(dossier, rival):
 
 def taunt(level_id, segment_name, rival):
     canned = narrative.taunt(level_id)
+    # Taunts default to canned to conserve the Gemini free-tier daily quota
+    # (20 req/day) for the investigation report, which is the call that
+    # actually needs to be dynamic. Set GEMINI_TAUNTS=1 to voice them too.
+    if not os.environ.get("GEMINI_TAUNTS"):
+        return canned
     client = _get_client()
     if client is None:
         return canned
