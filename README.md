@@ -33,6 +33,23 @@ python3 -m venv .venv
 # open http://127.0.0.1:8000
 ```
 
+## Deploy a live demo
+
+The repo is deploy-ready for [Render](https://render.com) (free tier):
+
+1. Push to GitHub, then on Render: **New → Web Service → connect this repo**.
+2. Render reads `render.yaml` automatically (build `pip install -r
+   requirements.txt`, start `uvicorn backend.main:app --host 0.0.0.0 --port
+   $PORT`).
+3. Deploy. No env vars required — the public build runs on **DuckDB**, so
+   public traffic never touches the Snowflake trial credits.
+
+Optional: add `GEMINI_API_KEY` / `ELEVENLABS_API_KEY` as Render env vars for
+live voice + AI report. Both degrade gracefully (canned / silent) when the
+free-tier quota runs out, so the app never breaks. Leave the `SNOWFLAKE_*`
+vars unset for the public demo; the full Snowflake Time Travel experience is
+best shown in the recorded walkthrough.
+
 ## Tests
 
 97 tests across the forensic engine, the game state machine, and the HTTP

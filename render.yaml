@@ -1,0 +1,20 @@
+# One-click deploy to Render (https://render.com).
+# Public build runs on DuckDB (no Snowflake env vars) so public traffic can't
+# burn the Snowflake trial credits. Gemini/ElevenLabs are optional — add the
+# keys as env vars for live voice + AI report; both degrade gracefully when the
+# free-tier quota runs out (canned narrative / silent), so the app never breaks.
+services:
+  - type: web
+    name: false-summit
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.7"
+      # Optional — uncomment in the Render dashboard (do NOT commit real keys):
+      # - key: GEMINI_API_KEY
+      #   sync: false
+      # - key: ELEVENLABS_API_KEY
+      #   sync: false
