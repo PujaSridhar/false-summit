@@ -5,52 +5,150 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>False Summit</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
+<!-- ============ PROLOGUE / TITLE ============ -->
+<div id="title" class="overlay title">
+  <div class="title-inner">
+    <div class="title-logo">FALSE<span>SUMMIT</span></div>
+    <div class="title-tag">every crown has a price</div>
+    <div class="title-story">
+      <p>You and <b>Dax</b> used to ride together. Then he took the one crown
+      that mattered — and the friendship went with it.</p>
+      <p>You can't beat him on the road anymore. But the leaderboard doesn't
+      see the road. It sees a <b>file</b>. And files can be edited.</p>
+      <p class="title-warn">Every upload runs through the integrity audit.
+      How far will you go to take back what was yours?</p>
+    </div>
+    <button id="start-btn" class="btn-primary huge">ENTER THE SEASON</button>
+    <div class="title-tech">
+      <span>Snowflake Time&nbsp;Travel</span>
+      <span>Google Gemini</span>
+      <span>ElevenLabs</span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ HOW TO PLAY ============ -->
+<div id="howto" class="overlay hidden">
+  <div class="howto-box">
+    <div class="howto-kicker">HOW TO PLAY</div>
+    <h2>Beat Dax. Don't get caught.</h2>
+    <p class="howto-lead">You can't out-ride Dax anymore — but the leaderboard only
+    sees the <b>GPS file</b> you upload, and a file can be edited.</p>
+    <ol class="howto-steps">
+      <li><span class="hs-n">1</span><div><b>Doctor the file.</b> Switch on a tool in
+        <b>THE TOOLKIT</b> and drag its sliders. Watch <b>YOUR&nbsp;UPLOAD</b> time drop.</div></li>
+      <li><span class="hs-n">2</span><div><b>Beat the crown.</b> Get your time
+        <b>under Dax's</b> — the gap turns orange when you're ahead.</div></li>
+      <li><span class="hs-n">3</span><div><b>Survive the audit.</b> Hit <b>UPLOAD RIDE</b>.
+        Forensic checks scan your file. Cheat too hard and the physics catches you.</div></li>
+    </ol>
+    <button id="howto-go" class="btn-primary huge">GOT IT — LET'S RIDE</button>
+  </div>
+</div>
+
+<!-- ============ TOP BAR ============ -->
 <header>
   <div class="logo">FALSE<span>SUMMIT</span></div>
-  <div class="tagline">every crown has a price</div>
-  <div id="scoreboard"></div>
+  <div class="rivalry" id="rivalry">
+    <span class="rv-name you">YOU</span>
+    <span class="rv-score" id="rv-score">0–0</span>
+    <span class="rv-name rival">DAX</span>
+  </div>
+  <div class="topright">
+    <button id="sound-toggle" class="sound-toggle" title="Toggle sound">SOUND&nbsp;ON</button>
+    <div id="scoreboard" class="scoreboard"></div>
+  </div>
 </header>
 
+<div id="objective" class="objective"></div>
+
+<!-- ============ PLAY ============ -->
 <main>
   <section class="left">
-    <div id="map"></div>
-    <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    <div class="exhibit">
+      <div class="panel-label">EXHIBIT · GPS TRACK <span id="map-seg"></span></div>
+      <div id="map"></div>
+    </div>
+    <div class="telemetry">
+      <div class="panel-label">TELEMETRY · SPEED / ELEVATION / HEART RATE</div>
+      <div class="chart-wrap"><canvas id="chart"></canvas></div>
+    </div>
   </section>
 
   <aside class="right">
-    <div class="card" id="level-card">
+    <div class="brief">
       <div class="level-kicker" id="level-kicker"></div>
       <h2 id="level-title"></h2>
-      <p id="level-brief"></p>
-      <p class="taunt" id="level-taunt"></p>
-      <p class="intel"><b>INTEL</b> <span id="level-intel"></span></p>
+      <p id="level-brief" class="brief-body"></p>
+      <div class="taunt" id="level-taunt-wrap">
+        <span class="taunt-mark" id="taunt-mark">DAX</span>
+        <button id="taunt-play" class="voice-btn" title="Hear Dax's voice">▶ VOICE</button>
+        <span id="level-taunt"></span>
+      </div>
+      <div class="intel"><span class="intel-tag">INTEL</span><span id="level-intel"></span></div>
     </div>
 
-    <div class="card times">
-      <div class="time-row rival"><span id="rival-name">Rival</span><b id="rival-time">–</b></div>
-      <div class="time-row you"><span>Your upload</span><b id="your-time">–</b></div>
-      <div id="delta" class="delta"></div>
+    <div class="matchup">
+      <div class="mu-col you">
+        <div class="mu-label">YOUR UPLOAD</div>
+        <div class="mu-time" id="your-time">–:––</div>
+      </div>
+      <div class="mu-vs">
+        <div class="mu-delta" id="delta">—</div>
+      </div>
+      <div class="mu-col rival">
+        <div class="mu-label" id="rival-name">DAX · CROWN</div>
+        <div class="mu-time" id="rival-time">–:––</div>
+      </div>
     </div>
 
-    <div class="card" id="tools-card">
-      <h3>The Toolkit</h3>
+    <div class="toolkit">
+      <div class="panel-label">THE TOOLKIT</div>
       <div id="tools"></div>
     </div>
 
-    <button id="upload-btn">UPLOAD RIDE</button>
-    <div class="audit-note">Uploads run through the integrity audit. There is no undo.</div>
+    <button id="upload-btn" class="btn-primary">UPLOAD RIDE</button>
+    <div class="audit-note" id="audit-note">Every upload is audited. There is no undo.</div>
   </aside>
 </main>
 
-<div id="modal" class="modal hidden">
-  <div class="modal-box">
-    <div id="modal-outcome" class="outcome"></div>
-    <div id="modal-verdict" class="verdict"></div>
-    <div id="modal-checks"></div>
-    <div id="modal-actions"></div>
+<!-- ============ AUDIT SCAN OVERLAY ============ -->
+<div id="audit" class="overlay hidden">
+  <div class="audit-box">
+    <div class="audit-head">
+      <div class="audit-title" id="audit-title">INTEGRITY AUDIT</div>
+      <div class="audit-sub" id="audit-sub">Running forensic checks…</div>
+    </div>
+    <div id="audit-checks" class="audit-checks"></div>
+    <div id="audit-foot" class="audit-foot hidden">
+      <div id="audit-outcome" class="audit-outcome"></div>
+      <div id="audit-verdict" class="audit-verdict"></div>
+      <div id="audit-actions" class="audit-actions"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============ CASE FILE (report) ============ -->
+<div id="report" class="overlay hidden">
+  <div class="report-box">
+    <div class="report-head">
+      <div class="report-stamp" id="report-stamp">CASE CLOSED</div>
+      <h2 id="report-title"></h2>
+      <p id="report-subtitle"></p>
+    </div>
+    <div id="report-findings" class="report-findings"></div>
+    <div class="report-verdict" id="report-verdict"></div>
+    <button id="report-play" class="voice-btn wide">▶ HEAR THE INVESTIGATOR'S VERDICT</button>
+    <div class="report-tally" id="report-tally"></div>
+    <div class="report-epilogue" id="report-epilogue"></div>
+    <div class="audit-actions"><button class="btn-primary" onclick="location.reload()">NEW SEASON</button></div>
   </div>
 </div>
 
