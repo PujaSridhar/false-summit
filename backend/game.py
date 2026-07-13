@@ -160,6 +160,8 @@ def _advance_on_win(game, resp):
 
 def upload(gid, ops):
     game = GAMES[gid]
+    if game["state"] == "finished":
+        raise ValueError("the season is over")
     cfg = level_cfg(game["level"])
     doctored = apply_ops(game["honest"], game["segment"], _inject(game, ops))
     stats = ride_stats(doctored)

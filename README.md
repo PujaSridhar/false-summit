@@ -33,7 +33,27 @@ python3 -m venv .venv
 # open http://127.0.0.1:8000
 ```
 
-Smoke test / threshold calibration:
+## Tests
+
+97 tests across the forensic engine, the game state machine, and the HTTP
+layer. They run fully offline and deterministic (DuckDB storage, canned
+narrative, silent voice — no API keys or network needed).
+
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+.venv/bin/pytest            # 97 tests
+```
+
+- `tests/test_physics.py` — solver convergence, kinematics, degenerate rides
+- `tests/test_cheats.py` — each cheat op incl. boundary params
+- `tests/test_detection.py` — every audit check in isolation + the
+  Snowflake dialect translation + the Time Travel snapshot diff
+- `tests/test_game.py` — full playthrough + illegal state transitions
+- `tests/test_api.py` — every endpoint, happy and error paths (400/404/409/422)
+- `tests/test_edge_cases.py` — empty rides, zero/negative params, missing
+  keys, unknown ids — everything degrades instead of crashing
+
+End-to-end smoke test / threshold calibration (plays all five levels):
 
 ```bash
 .venv/bin/python scripts/smoke.py

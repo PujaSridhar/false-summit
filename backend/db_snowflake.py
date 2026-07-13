@@ -87,20 +87,47 @@ def _rows(activity_id, points):
              p["hr"], p["cad"], d_list[i]) for i, p in enumerate(points)]
 
 
+def _is_recoverable(e):
+    """Snowflake session/token expiry — a long idle drops the session. The
+    connector's keep-alive usually prevents this, but if it slips, reconnecting
+    fixes it, so we never 500 a live demo over an expired token."""
+    s = str(e).lower()
+    return ("390114" in s or "390111" in s or "token has expired" in s
+            or "authentication token" in s or "session no longer exists" in s)
+
+
+def _op(work, _retry=True):
+    """Run `work(cursor)` under the lock; on a recoverable auth/session error,
+    drop the stale connection and retry once against a fresh one."""
+    global _conn
+    try:
+        with _lock:
+            cur = conn().cursor()
+            try:
+                return work(cur)
+            finally:
+                cur.close()
+    except snowflake.connector.errors.Error as e:
+        if _retry and _is_recoverable(e):
+            with _lock:
+                _conn = None  # force reconnect on next conn()
+            return _op(work, _retry=False)
+        raise
+
+
 def insert_activity(activity_id, game_id, level, kind, points, snapshot=False):
     # Time Travel is our snapshot — the duplicate "snapshot" write is a no-op.
     if snapshot:
         return
     rows = _rows(activity_id, points)
-    with _lock:
-        cur = conn().cursor()
+
+    def work(cur):
         cur.execute("INSERT INTO activities(id, game_id, level, kind) VALUES (?, ?, ?, ?)",
                     [activity_id, game_id, level, kind])
-        cur.executemany(
-            "INSERT INTO trackpoints VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+        cur.executemany("INSERT INTO trackpoints VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
         cur.execute("SELECT current_timestamp()")
         _original_ts[activity_id] = cur.fetchone()[0]
-        cur.close()
+    _op(work)
 
 
 def insert_profile(game_id, level, segment):
@@ -112,21 +139,17 @@ def insert_profile(game_id, level, segment):
             continue
         seen.add(bucket)
         rows.append((game_id, level, bucket, ele))
-    with _lock:
-        cur = conn().cursor()
-        cur.executemany("INSERT INTO segment_profile VALUES (?, ?, ?, ?)", rows)
-        cur.close()
+    _op(lambda cur: cur.executemany("INSERT INTO segment_profile VALUES (?, ?, ?, ?)", rows))
 
 
 def replace_activity_points(activity_id, points):
     """Rewrite the live file. The pre-edit rows survive only in Time Travel."""
     rows = _rows(activity_id, points)
-    with _lock:
-        cur = conn().cursor()
+
+    def work(cur):
         cur.execute("DELETE FROM trackpoints WHERE activity_id = ?", [activity_id])
-        cur.executemany(
-            "INSERT INTO trackpoints VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
-        cur.close()
+        cur.executemany("INSERT INTO trackpoints VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)", rows)
+    _op(work)
 
 
 def snapshot_changed_count(activity_id):
@@ -143,23 +166,19 @@ def snapshot_changed_count(activity_id):
       FROM trackpoints AT(TIMESTAMP => ?::timestamp_ntz) WHERE activity_id = ?
     )
     """
-    with _lock:
-        cur = conn().cursor()
+
+    def work(cur):
         cur.execute(sql, [activity_id, ts, activity_id])
-        n = cur.fetchone()[0] or 0
-        cur.close()
-    return n
+        return cur.fetchone()[0] or 0
+    return _op(work)
 
 
 def record_audit(activity_id, results):
     rows = [(activity_id, r["name"], bool(r["passed"]), r["detail"],
              json.dumps(r.get("evidence", {}))) for r in results]
-    with _lock:
-        cur = conn().cursor()
-        cur.executemany(
-            "INSERT INTO audits(activity_id, check_name, passed, detail, evidence) "
-            "VALUES (?, ?, ?, ?, ?)", rows)
-        cur.close()
+    _op(lambda cur: cur.executemany(
+        "INSERT INTO audits(activity_id, check_name, passed, detail, evidence) "
+        "VALUES (?, ?, ?, ?, ?)", rows))
 
 
 def _norm(v):
@@ -169,9 +188,9 @@ def _norm(v):
 
 
 def query(sql, params=None):
-    with _lock:
-        cur = conn().cursor()
-        cur.execute(_to_snowflake(sql), params or [])
-        out = cur.fetchall()
-        cur.close()
-    return [tuple(_norm(x) for x in row) for row in out]
+    sql2 = _to_snowflake(sql)
+
+    def work(cur):
+        cur.execute(sql2, params or [])
+        return [tuple(_norm(x) for x in row) for row in cur.fetchall()]
+    return _op(work)

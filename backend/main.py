@@ -1,20 +1,24 @@
 """FastAPI app — thin HTTP layer over game.py."""
 import os
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from . import ai, db, game, voice
+from .cheats import TOOLS
 
-app = FastAPI(title="False Summit")
 
-
-@app.on_event("startup")
-def _log_config():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     print(f"[false-summit] storage={db.BACKEND}  "
           f"gemini={'on' if ai.enabled() else 'off (canned)'}  "
           f"voice={'on' if voice.enabled() else 'off (silent)'}")
+    yield
+
+
+app = FastAPI(title="False Summit", lifespan=lifespan)
 
 
 @app.get("/api/config")
@@ -32,6 +36,9 @@ class OpsBody(BaseModel):
 
 
 def _ops(body: OpsBody):
+    for o in body.ops:
+        if o.tool not in TOOLS:
+            raise HTTPException(400, f"unknown tool: {o.tool}")
     return [{"tool": o.tool, "params": o.params or {}} for o in body.ops]
 
 
@@ -58,7 +65,10 @@ def preview(gid: str, body: OpsBody):
 def upload(gid: str, body: OpsBody):
     if gid not in game.GAMES:
         raise HTTPException(404, "no such game")
-    return game.upload(gid, _ops(body))
+    try:
+        return game.upload(gid, _ops(body))
+    except ValueError as e:
+        raise HTTPException(400, str(e))
 
 
 class ReviewBody(BaseModel):

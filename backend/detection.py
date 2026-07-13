@@ -191,8 +191,9 @@ def check_hr_flat(activity_id, params, ctx):
     min_sd = float(params.get("min_sd", 2.5))
     row = _one("SELECT stddev_samp(hr), avg(hr) FROM trackpoints WHERE activity_id = ? AND hr > 0",
                [activity_id])
-    sd, avg = row
+    sd, avg = row if row else (None, None)
     sd = sd or 0.0
+    avg = avg or 0.0
     passed = sd >= min_sd
     return {
         "name": "hr_flat", "title": "Heart-rate variability",
